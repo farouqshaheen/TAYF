@@ -33,6 +33,7 @@ def apply_suspect(
     rng: np.random.Generator,
     step: int,
     total_steps: int,
+    severity: float = 1.0,
 ) -> dict:
     """
     يطبّق تأثير كل مشتبه فيه على معاملات الرابط
@@ -48,24 +49,25 @@ def apply_suspect(
     extra  = 0.0           # خسارة إضافية
     fluct  = 0.0           # تذبذب سريع
 
+    severity = float(np.clip(severity, 0.0, 1.0))
     t = step / max(total_steps - 1, 1)   # 0..1 يمثل تقدم الحادث
 
     if suspect == "الغايب":
         # في مسألة ابتعاد المستقبل (Path loss)، غالباً ما يكون هناك انتقال إلى موقع أبعد أو زيادة حادة في المسافة
         # بعد الخط الأساسي، يبتعد المستقبل مباشرة ويبقى بعيداً مع حركة خفيفة
-        dist = params.dist_km * (3.5 + 0.5 * t)
+        dist = params.dist_km * (1.0 + severity * (2.5 + 0.5 * t))
 
     elif suspect == "الشبح":
         # حقن ضوضاء وتداخل تشويش فوري ومتصاعد
-        noise = params.noise_dbm + 12.0 + t * 15.0
+        noise = params.noise_dbm + severity * (12.0 + t * 15.0)
 
     elif suspect == "المرتجف":
         # تذبذبات سريعة عشوائية حول المتوسط (Rayleigh / multipath fast fading)
-        fluct = rng.normal(0, 6.0)
+        fluct = rng.normal(0, 6.0 * severity)
 
     elif suspect == "الظل":
         # عائق يمر ببطء تدريجي (Slow fading / shadowing)
-        extra = t * 20.0
+        extra = t * 20.0 * severity
 
     # احسب FSPL
     pl = fspl_db(params.freq_mhz, dist)
@@ -96,4 +98,3 @@ def apply_suspect(
         "rssi_dbm":             round(rx, 2),
         "packet_loss_pct":      round(pl_pct, 2),
     }
-

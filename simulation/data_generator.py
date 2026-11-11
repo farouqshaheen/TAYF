@@ -45,11 +45,12 @@ def generate_incident(
     params: LinkParams,
     suspect: SuspectName,
     rng: np.random.Generator,
+    severity: float = 1.0,
 ) -> list[dict]:
     """يولّد فترة الحادث"""
     rows = []
     for i in range(INCIDENT_STEPS):
-        data = apply_suspect(params, suspect, rng, i, INCIDENT_STEPS)
+        data = apply_suspect(params, suspect, rng, i, INCIDENT_STEPS, severity=severity)
         data.update({
             "step":    BASELINE_STEPS + i,
             "phase":   "حادث",
@@ -63,6 +64,7 @@ def run_simulation(
     suspect: SuspectName,
     params: LinkParams | None = None,
     seed: int = 42,
+    severity: float = 1.0,
 ) -> pd.DataFrame:
     """
     يشغّل المحاكاة الكاملة ويرجع DataFrame
@@ -73,9 +75,8 @@ def run_simulation(
     rng = np.random.default_rng(seed)
 
     baseline = generate_baseline(params, rng)
-    incident = generate_incident(params, suspect, rng)
+    incident = generate_incident(params, suspect, rng, severity=severity)
 
     df = pd.DataFrame(baseline + incident)
     df["timestamp_s"] = df["step"]   # ثانية واحدة لكل خطوة
     return df
-
