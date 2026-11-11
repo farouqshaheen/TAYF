@@ -74,3 +74,4 @@ def create_interactive_ber(current_snr: float, baseline_snr: float = 25.0) -> go
     )
 
     return fig
+

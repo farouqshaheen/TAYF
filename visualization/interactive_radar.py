@@ -52,3 +52,4 @@ def create_interactive_radar(metrics_dict: dict, suspect_name: str = "مجهول
     )
 
     return fig
+
