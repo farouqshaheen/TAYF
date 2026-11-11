@@ -18,6 +18,7 @@ const audioUrl = requestedAudio.startsWith('/app/static/doctor_character/assets/
 const audioPlayer = audioUrl ? new Audio(audioUrl) : null;
 if (audioPlayer) audioPlayer.preload = 'auto';
 speechText.textContent = dialogue;
+let idleStatus = 'جارٍ تحميل المجسم…';
 let headBone = null;
 let headRestQuaternion = null;
 let speechActive = false;
@@ -35,7 +36,7 @@ function resetSpeechState() {
   speechActive = false;
   speechBubble.classList.remove('is-speaking');
   speakButton.textContent = 'استمع';
-  status.textContent = loaded ? 'حركة هادئة · اسحب للتدوير' : 'اسحب للتدوير · مرّر للتكبير';
+  status.textContent = idleStatus;
   if (headBone && headRestQuaternion) headBone.quaternion.copy(headRestQuaternion);
 }
 
@@ -127,6 +128,63 @@ const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matc
 controls.autoRotate = !reducedMotion;
 controls.autoRotateSpeed = 0.45;
 
+const raycaster = new THREE.Raycaster();
+const pointer = new THREE.Vector2();
+let characterRoot = null;
+let cameraViewIndex = 0;
+let cameraTransition = null;
+let pointerDown = null;
+const cameraViews = [
+  new THREE.Vector3(0, 1.05, 3.35),
+  new THREE.Vector3(2.35, 1.1, 2.65),
+  new THREE.Vector3(-2.35, 1.1, 2.65),
+];
+const cameraLookTarget = new THREE.Vector3(0, 0.92, 0);
+controls.addEventListener('start', () => { cameraTransition = null; });
+
+function cycleCameraView() {
+  if (!characterRoot) return;
+  cameraViewIndex = (cameraViewIndex + 1) % cameraViews.length;
+  controls.autoRotate = false;
+  const targetPosition = cameraViews[cameraViewIndex].clone();
+  const targetLookAt = cameraLookTarget.clone();
+  if (reducedMotion) {
+    camera.position.copy(targetPosition);
+    controls.target.copy(targetLookAt);
+    controls.update();
+    cameraTransition = null;
+  } else {
+    cameraTransition = { position: targetPosition, target: targetLookAt };
+  }
+  const angleName = ['الأمامية', 'الجانبية الأولى', 'الجانبية الثانية'][cameraViewIndex];
+  idleStatus = `الزاوية ${angleName} · انقر على الدكتور للتبديل`;
+  if (!speechActive) status.textContent = idleStatus;
+}
+
+renderer.domElement.tabIndex = 0;
+renderer.domElement.setAttribute('aria-label', 'مجسم الدكتور. انقر أو اضغط Enter لتغيير زاوية الكاميرا، واسحب للتدوير.');
+renderer.domElement.addEventListener('pointerdown', (event) => {
+  if (event.button === 0) pointerDown = { x: event.clientX, y: event.clientY };
+});
+renderer.domElement.addEventListener('pointercancel', () => { pointerDown = null; });
+renderer.domElement.addEventListener('pointerup', (event) => {
+  if (!pointerDown || !characterRoot) return;
+  const distance = Math.hypot(event.clientX - pointerDown.x, event.clientY - pointerDown.y);
+  pointerDown = null;
+  if (distance > 6) return;
+  const bounds = renderer.domElement.getBoundingClientRect();
+  pointer.x = ((event.clientX - bounds.left) / bounds.width) * 2 - 1;
+  pointer.y = -((event.clientY - bounds.top) / bounds.height) * 2 + 1;
+  raycaster.setFromCamera(pointer, camera);
+  if (raycaster.intersectObject(characterRoot, true).length > 0) cycleCameraView();
+});
+renderer.domElement.addEventListener('keydown', (event) => {
+  if (event.key === 'Enter' || event.key === ' ') {
+    event.preventDefault();
+    cycleCameraView();
+  }
+});
+
 const floor = new THREE.GridHelper(8, 24, 0x315266, 0x1d3041);
 floor.position.y = 0.012;
 floor.material.transparent = true;
@@ -162,6 +220,7 @@ loader.load(
   modelUrl,
   (gltf) => {
     const character = gltf.scene;
+    characterRoot = character;
     // The supplied asset faces +X; rotate toward the default +Z camera.
     character.rotation.y = -Math.PI / 2;
     scene.add(character);
@@ -184,10 +243,11 @@ loader.load(
       const idleAction = mixer.clipAction(idleClip);
       idleAction.setLoop(THREE.LoopRepeat, Infinity);
       idleAction.play();
-      status.textContent = 'حركة هادئة · اسحب للتدوير';
     } else {
-      status.textContent = 'اسحب للتدوير · لا توجد حركة مرفقة';
+      idleStatus = 'لا توجد حركة مرفقة · انقر على الدكتور لتغيير الزاوية';
     }
+    if (idleClip) idleStatus = 'انقر على الدكتور لتغيير الزاوية · اسحب للتدوير';
+    status.textContent = idleStatus;
     loading.hidden = true;
     loaded = true;
   },
@@ -201,7 +261,8 @@ loader.load(
     console.error('Doctor model failed to load:', error);
     loading.hidden = true;
     errorPanel.hidden = false;
-    status.textContent = 'لم يتم تحميل النموذج';
+    idleStatus = 'لم يتم تحميل النموذج';
+    status.textContent = idleStatus;
   },
 );
 
@@ -214,6 +275,17 @@ function renderFrame() {
       0.025 * Math.sin(clock.elapsedTime * 13),
     );
     headBone.quaternion.copy(headRestQuaternion).multiply(nod);
+  }
+  if (cameraTransition) {
+    const blend = 1 - Math.exp(-delta * 4.5);
+    camera.position.lerp(cameraTransition.position, blend);
+    controls.target.lerp(cameraTransition.target, blend);
+    if (camera.position.distanceToSquared(cameraTransition.position) < 0.0004
+      && controls.target.distanceToSquared(cameraTransition.target) < 0.0004) {
+      camera.position.copy(cameraTransition.position);
+      controls.target.copy(cameraTransition.target);
+      cameraTransition = null;
+    }
   }
   controls.update();
   renderer.render(scene, camera);
