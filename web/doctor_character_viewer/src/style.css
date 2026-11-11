@@ -1,10 +1,28 @@
 * { box-sizing: border-box; }
 html, body { width: 100%; height: 100%; margin: 0; overflow: hidden; }
 body { color: #d9e6ee; background: #0b1520; font-family: "IBM Plex Sans Arabic", system-ui, sans-serif; }
-#stage { position: relative; width: 100%; height: 300px; overflow: hidden; border: 1px solid rgba(82,224,209,.25); border-radius: 14px; background: radial-gradient(ellipse at 50% 85%, rgba(20,54,66,.72), #0b1520 68%); }
+#assistant { width: 100%; height: 100%; display: flex; flex-direction: column; gap: 8px; padding: 0 1px 1px; }
+#stage { position: relative; flex: 0 0 300px; width: 100%; overflow: hidden; border: 1px solid rgba(82,224,209,.25); border-radius: 14px; background: radial-gradient(ellipse at 50% 85%, rgba(20,54,66,.72), #0b1520 68%); }
 #stage canvas { display: block; width: 100%; height: 100%; cursor: grab; touch-action: none; }
 #stage canvas:active { cursor: grabbing; }
 #loading, #error { position: absolute; z-index: 2; left: 50%; top: 45%; transform: translate(-50%,-50%); color: #a9c3d2; font-size: 13px; text-align: center; }
 #error { color: #ffbd69; padding: 10px 14px; border: 1px solid rgba(255,189,105,.28); border-radius: 10px; background: rgba(11,21,32,.9); }
 #status { position: absolute; z-index: 2; right: 11px; top: 10px; padding: 5px 9px; color: #9bb5c4; border: 1px solid rgba(82,224,209,.17); border-radius: 99px; background: rgba(8,17,27,.72); font-size: 10px; pointer-events: none; }
-@media (prefers-reduced-motion: reduce) { #stage canvas { cursor: default; } }
+#speech-bubble { position: relative; flex: 1 1 auto; min-height: 106px; padding: 10px 12px; border: 1px solid rgba(82,224,209,.32); border-radius: 13px; background: linear-gradient(145deg,rgba(14,35,47,.98),rgba(10,20,31,.98)); box-shadow: 0 8px 24px rgba(0,0,0,.15), inset 0 1px rgba(255,255,255,.025); transition: border-color .2s, box-shadow .2s; }
+#speech-bubble::before { content: ""; position: absolute; top: -6px; right: 28px; width: 10px; height: 10px; transform: rotate(45deg); background: #10232f; border-top: 1px solid rgba(82,224,209,.32); border-left: 1px solid rgba(82,224,209,.32); }
+.speech-head { display: flex; align-items: center; gap: 8px; min-height: 28px; }
+.speaker-name { color: #52e0d1; font-weight: 700; font-size: 12px; white-space: nowrap; }
+.speaker-role { color: #91a2b8; font-weight: 400; }
+#speech-text { margin: 6px 0 0; color: #e2ebf2; font-size: 12px; line-height: 1.65; text-align: right; }
+#speak-button { margin-inline-start: auto; border: 1px solid rgba(82,224,209,.35); border-radius: 8px; padding: 4px 10px; background: rgba(82,224,209,.1); color: #bffaf3; font: inherit; font-size: 11px; cursor: pointer; transition: background .2s, transform .2s; }
+#speak-button:hover { background: rgba(82,224,209,.2); transform: translateY(-1px); }
+#speak-button:disabled { opacity: .48; cursor: not-allowed; }
+#speaking-indicator { display: none; align-items: center; gap: 3px; height: 18px; }
+#speaking-indicator i { display: block; width: 3px; height: 6px; border-radius: 4px; background: #52e0d1; }
+#speech-bubble.is-speaking { border-color: rgba(82,224,209,.82); box-shadow: 0 0 20px rgba(82,224,209,.12); }
+#speech-bubble.is-speaking #speaking-indicator { display: flex; }
+#speech-bubble.is-speaking #speaking-indicator i { animation: voice-wave .55s ease-in-out infinite alternate; }
+#speech-bubble.is-speaking #speaking-indicator i:nth-child(2) { animation-delay: .16s; }
+#speech-bubble.is-speaking #speaking-indicator i:nth-child(3) { animation-delay: .3s; }
+@keyframes voice-wave { to { height: 15px; } }
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; scroll-behavior: auto !important; } #stage canvas { cursor: default; } }

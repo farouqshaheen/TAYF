@@ -7,6 +7,90 @@ const stage = document.querySelector('#stage');
 const loading = document.querySelector('#loading');
 const status = document.querySelector('#status');
 const errorPanel = document.querySelector('#error');
+const speechBubble = document.querySelector('#speech-bubble');
+const speechText = document.querySelector('#speech-text');
+const speakButton = document.querySelector('#speak-button');
+
+const query = new URLSearchParams(window.location.search);
+const dialogue = query.get('text') || speechText.textContent;
+const requestedAudio = query.get('audio') || '';
+const audioUrl = requestedAudio.startsWith('/app/static/doctor_character/assets/audio/') ? requestedAudio : '';
+const audioPlayer = audioUrl ? new Audio(audioUrl) : null;
+if (audioPlayer) audioPlayer.preload = 'auto';
+speechText.textContent = dialogue;
+let headBone = null;
+let headRestQuaternion = null;
+let speechActive = false;
+
+function stopSpeech() {
+  if (audioPlayer) {
+    audioPlayer.pause();
+    audioPlayer.currentTime = 0;
+  }
+  if ('speechSynthesis' in window) window.speechSynthesis.cancel();
+  resetSpeechState();
+}
+
+function resetSpeechState() {
+  speechActive = false;
+  speechBubble.classList.remove('is-speaking');
+  speakButton.textContent = 'استمع';
+  status.textContent = loaded ? 'حركة هادئة · اسحب للتدوير' : 'اسحب للتدوير · مرّر للتكبير';
+  if (headBone && headRestQuaternion) headBone.quaternion.copy(headRestQuaternion);
+}
+
+function setSpeakingState() {
+  speechActive = true;
+  speechBubble.classList.add('is-speaking');
+  speakButton.textContent = 'إيقاف';
+  status.textContent = 'يتحدث د. محمد…';
+}
+
+function speakWithBrowserVoice() {
+  if (!('speechSynthesis' in window) || !('SpeechSynthesisUtterance' in window)) {
+    status.textContent = 'تعذّر تحميل الملف الصوتي';
+    return;
+  }
+  const arabicVoice = window.speechSynthesis.getVoices().find((voice) => /^ar(?:-|$)/i.test(voice.lang));
+  if (!arabicVoice) {
+    status.textContent = 'تعذّر تحميل الصوت العربي';
+    return;
+  }
+  const utterance = new SpeechSynthesisUtterance(dialogue);
+  utterance.lang = arabicVoice.lang;
+  utterance.rate = 0.94;
+  utterance.pitch = 0.94;
+  utterance.voice = arabicVoice;
+  utterance.onstart = setSpeakingState;
+  utterance.onend = resetSpeechState;
+  utterance.onerror = resetSpeechState;
+  window.speechSynthesis.cancel();
+  window.speechSynthesis.speak(utterance);
+}
+
+function speakDialogue() {
+  if (speechActive) {
+    stopSpeech();
+    return;
+  }
+  if (audioPlayer) {
+    setSpeakingState();
+    audioPlayer.currentTime = 0;
+    audioPlayer.onended = resetSpeechState;
+    audioPlayer.onerror = () => {
+      resetSpeechState();
+      speakWithBrowserVoice();
+    };
+    audioPlayer.play().catch(() => {
+      resetSpeechState();
+      speakWithBrowserVoice();
+    });
+    return;
+  }
+  speakWithBrowserVoice();
+}
+
+speakButton.addEventListener('click', speakDialogue);
 
 const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
 renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
@@ -81,6 +165,8 @@ loader.load(
     // The supplied asset faces +X; rotate toward the default +Z camera.
     character.rotation.y = -Math.PI / 2;
     scene.add(character);
+    headBone = character.getObjectByName('mixamorigHead') ?? character.getObjectByName('mixamorig:Head') ?? null;
+    headRestQuaternion = headBone?.quaternion.clone() ?? null;
 
     const originalBounds = new THREE.Box3().setFromObject(character);
     const originalSize = originalBounds.getSize(new THREE.Vector3());
@@ -122,6 +208,13 @@ loader.load(
 function renderFrame() {
   const delta = Math.min(clock.getDelta(), 0.05);
   if (mixer && loaded && !reducedMotion) mixer.update(delta);
+  if (headBone && speechActive && !reducedMotion) {
+    const nod = new THREE.Quaternion().setFromAxisAngle(
+      new THREE.Vector3(1, 0, 0),
+      0.025 * Math.sin(clock.elapsedTime * 13),
+    );
+    headBone.quaternion.copy(headRestQuaternion).multiply(nod);
+  }
   controls.update();
   renderer.render(scene, camera);
 }
@@ -138,4 +231,5 @@ const visibilityObserver = new IntersectionObserver(([entry]) => {
 });
 visibilityObserver.observe(stage);
 document.addEventListener('visibilitychange', syncAnimationLoop);
+window.addEventListener('pagehide', stopSpeech);
 syncAnimationLoop();

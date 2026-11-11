@@ -7,10 +7,20 @@
     <title>مشرف المختبر ثلاثي الأبعاد</title>
   </head>
   <body>
-    <main id="stage" aria-label="مجسم الدكتور محمد ثلاثي الأبعاد">
-      <div id="loading" role="status">جارٍ تحميل المجسم…</div>
-      <div id="status">اسحب للتدوير · مرّر للتكبير</div>
-      <div id="error" hidden>تعذر تحميل المجسم. تأكد أن ملفات static متاحة.</div>
+    <main id="assistant" aria-label="المساعد الأكاديمي د. محمد">
+      <section id="stage" aria-label="مجسم الدكتور محمد ثلاثي الأبعاد">
+        <div id="loading" role="status">جارٍ تحميل المجسم…</div>
+        <div id="status">اسحب للتدوير · مرّر للتكبير</div>
+        <div id="error" hidden>تعذر تحميل المجسم. تأكد أن ملفات static متاحة.</div>
+      </section>
+      <section id="speech-bubble" aria-live="polite">
+        <div class="speech-head">
+          <span class="speaker-name">د. محمد <span class="speaker-role">· مشرف المختبر</span></span>
+          <span id="speaking-indicator" aria-hidden="true"><i></i><i></i><i></i></span>
+          <button id="speak-button" type="button" aria-label="استمع إلى رسالة الدكتور">استمع</button>
+        </div>
+        <p id="speech-text">أهلاً بك في مختبر طيف.. افحص تدهور القناة واكتشف مين اللي شوش على اجتماعي اليوم!</p>
+      </section>
     </main>
     <script type="module" src="/src/main.js"></script>
   </body>
