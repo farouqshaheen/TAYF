@@ -87,8 +87,6 @@ df = run_simulation(suspect, params, seed=int(seed), severity=float(severity_pct
 stats = compare_phases(df)
 verdict_data = rank_suspects(df)
 incident_rows = df[df["phase"] == "حادث"]
-current_step = st.slider("حرّك المؤشر الزمني داخل المحاكاة", 0, len(df) - 1, 25, 1, help="اسحب المؤشر لاستكشاف القياسات لحظة بلحظة.")
-current = df.iloc[current_step]
 
 st.markdown("""
 <div class="hero">
@@ -98,6 +96,8 @@ st.markdown("""
 </div>
 """, unsafe_allow_html=True)
 st.write("")
+current_step = st.slider("حرّك المؤشر الزمني داخل المحاكاة", 0, len(df) - 1, 25, 1, help="اسحب المؤشر لاستكشاف القياسات لحظة بلحظة.")
+current = df.iloc[current_step]
 
 k1, k2, k3, k4 = st.columns(4)
 def metric_card(col, label: str, value: str, note: str):
