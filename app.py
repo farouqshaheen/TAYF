@@ -1,19 +1,25 @@
 """طيف — مختبر تفاعلي لمحاكاة التحقيق في الروابط اللاسلكية."""
 from __future__ import annotations
 
+import inspect
 import os
 import sys
+from html import escape
+from urllib.parse import urlencode
 
 import numpy as np
 import pandas as pd
 import streamlit as st
+import streamlit.components.v1 as components
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 if BASE_DIR not in sys.path:
     sys.path.insert(0, BASE_DIR)
 
 from analysis.diagnosis import rank_suspects
+from analysis.doctor_dialogue import doctor_audio_filename, doctor_dialogue
 from analysis.metrics import compare_phases
+from analysis.mentor import mentor_guidance
 from reporting.report_generator import export_dataframe_csv, generate_case_summary_text
 from simulation.data_generator import run_simulation
 from simulation.scenarios import LinkParams
@@ -22,24 +28,22 @@ from visualization.interactive_constellation import create_rich_constellation
 from visualization.interactive_heatmap import create_rich_heatmap
 from visualization.interactive_oscilloscope import create_interactive_heartbeat
 from visualization.interactive_radar import create_interactive_radar
-from visualization.doctor_3d_component import get_doctor_3d_html
-import streamlit.components.v1 as components
 
 st.set_page_config(
     page_title="طيف | مختبر الإشارات اللاسلكية",
     page_icon="📡",
     layout="wide",
-    initial_sidebar_state="expanded",
+    initial_sidebar_state="auto",
 )
 
 st.markdown("""
 <style>
 @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&display=swap');
 :root { --ink:#e7edf5; --muted:#91a2b8; --line:#243449; --panel:#0d1724; --cyan:#52e0d1; --amber:#ffbd69; }
-html, body, [class*="css"], [data-testid="stAppViewContainer"] { font-family:'IBM Plex Sans Arabic',sans-serif; direction:rtl; }
+html, body, .stApp, [data-testid="stSidebar"] { font-family:'IBM Plex Sans Arabic','Noto Sans Arabic',system-ui,sans-serif; direction:rtl; }
 .stApp { background:radial-gradient(ellipse at 18% 0%,#10263a 0%,#08111b 43%,#070c13 100%); color:var(--ink); }
 [data-testid="stSidebar"] { background:linear-gradient(180deg,#0b1622,#09111a); border-left:1px solid var(--line); }
-.block-container { max-width:1500px; padding-top:1.35rem; padding-bottom:3rem; }
+.block-container { max-width:1500px; padding:1.35rem clamp(.8rem,2.4vw,2rem) 3rem; }
 h1,h2,h3 { letter-spacing:-.02em; }
 .hero { border:1px solid #294154; border-radius:20px; padding:24px 28px; background:linear-gradient(112deg,rgba(16,42,57,.96),rgba(10,20,31,.94) 62%,rgba(11,25,36,.96)); position:relative; overflow:hidden; box-shadow:0 18px 55px rgba(0,0,0,.17); }
 .hero-layout { display:grid; grid-template-columns:minmax(0,1fr) 190px; gap:22px; align-items:center; }
@@ -63,27 +67,68 @@ h1,h2,h3 { letter-spacing:-.02em; }
 @keyframes live-pulse { 50% { opacity:.45; box-shadow:0 0 0 7px rgba(82,224,209,.04),0 0 17px rgba(82,224,209,.35); } }
 @keyframes contact-blink { 50% { opacity:.3; transform:scale(.7); } }
 @keyframes wave-flow { to { stroke-dashoffset:-68; } }
-@media (max-width:760px) { .hero-layout { grid-template-columns:1fr 92px; gap:8px; } .radar { width:84px; height:84px; } .hero { padding:18px; } .hero h1 { font-size:1.65rem; } .hero h1 .brand-word { font-size:1.9rem; } .hero p { font-size:.88rem; } .hero-visual { height:105px; } }
+@media (max-width:760px) { .hero-layout { grid-template-columns:minmax(0,1fr) 72px; gap:10px; } .radar { width:68px; height:68px; } .hero { padding:16px; } .hero h1 { font-size:clamp(1.35rem,4vw,1.75rem); } .hero h1 .brand-word { font-size:inherit; } .hero p { font-size:.86rem; line-height:1.65; } .hero-visual { height:82px; } .hero-meta { gap:6px; } .hero-meta span { font-size:.69rem; padding:4px 8px; } }
+@media (max-width:520px) { .block-container { padding:.8rem .65rem 2rem; } .hero-layout { grid-template-columns:minmax(0,1fr); } .hero-visual { display:none; } .hero { padding:15px; border-radius:16px; } .hero-topline { flex-wrap:wrap; font-size:.68rem; } .hero h1 { font-size:clamp(1.25rem,6vw,1.65rem); } .hero p { font-size:.81rem; } .hero-meta span { font-size:.66rem; } [data-testid="stTabs"] [role="tablist"] { overflow-x:auto; scrollbar-width:thin; } [data-testid="stTabs"] button { white-space:nowrap; flex:0 0 auto; font-size:.79rem; padding-inline:.55rem; } .metric { min-height:94px; padding:10px 11px; } .metric-value { font-size:clamp(1rem,4.6vw,1.42rem); } .metric-note { font-size:.67rem; line-height:1.35; } }
 @media (prefers-reduced-motion:reduce) { *, *::before, *::after { animation-duration:.01ms !important; animation-iteration-count:1 !important; scroll-behavior:auto !important; } }
+.metrics-grid { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:12px; margin:6px 0 12px; }
 .metric { background:linear-gradient(145deg,rgba(17,32,47,.96),rgba(10,18,28,.96)); border:1px solid var(--line); border-radius:14px; padding:14px 16px; min-height:108px; }
 .metric-label { color:var(--muted); font-size:.82rem; }
 .metric-value { color:var(--ink); font-size:1.75rem; font-weight:700; margin-top:7px; direction:ltr; text-align:right; }
 .metric-note { color:#8aa0b6; font-size:.75rem; margin-top:3px; }
+@media (max-width:900px) { .metrics-grid { grid-template-columns:repeat(2,minmax(0,1fr)); gap:9px; } }
+@media (max-width:520px) { .metrics-grid .metric { min-height:94px; padding:10px 11px; } .metrics-grid .metric-value { font-size:clamp(1rem,4.6vw,1.42rem); } .metrics-grid .metric-note { font-size:.67rem; line-height:1.35; } }
 .section-kicker { color:var(--cyan); font-size:.8rem; font-weight:700; letter-spacing:.08em; }
 .verdict { border:1px solid rgba(255,189,105,.45); background:linear-gradient(135deg,rgba(82,50,20,.3),rgba(16,25,36,.9)); border-radius:14px; padding:16px 19px; }
-[data-testid="stTabs"] button { font-weight:600; }
+.mentor-card { border:1px solid rgba(82,224,209,.28); border-radius:14px; padding:14px; margin-top:10px; background:linear-gradient(145deg,rgba(15,38,49,.92),rgba(10,20,31,.96)); box-shadow:inset 0 1px rgba(255,255,255,.025); }
+.mentor-head { display:flex; align-items:center; gap:11px; margin-bottom:11px; }
+.mentor-avatar { display:grid; place-items:center; width:44px; height:44px; flex:0 0 44px; border:1px solid rgba(82,224,209,.42); border-radius:50%; background:radial-gradient(circle at 35% 28%,rgba(82,224,209,.23),rgba(17,38,51,.96) 72%); color:var(--cyan); font-size:.86rem; font-weight:700; box-shadow:0 0 18px rgba(82,224,209,.11); }
+.mentor-name { color:var(--ink); font-weight:700; font-size:.91rem; }
+.mentor-role { display:block; color:var(--muted); font-size:.71rem; margin-top:2px; }
+.mentor-note { color:#c7d5e2; line-height:1.8; font-size:.84rem; margin:0; }
+.mentor-disclaimer { color:#8195a8; font-size:.68rem; margin-top:9px; }
+.doctor-quote { border:1px solid rgba(82,224,209,.32); border-radius:14px; padding:14px 16px; margin:12px 0; background:linear-gradient(135deg,rgba(16,42,57,.92),rgba(10,20,31,.96)); box-shadow:0 10px 28px rgba(0,0,0,.12); }
+.doctor-quote span { color:var(--cyan); font-size:.75rem; font-weight:700; }
+.doctor-quote p { color:#e5edf4; margin:7px 0 0; line-height:1.8; }
+[data-testid="stTabs"] [role="tablist"] { gap:.3rem; max-width:100%; }
+[data-testid="stTabs"] button { font-weight:600; white-space:nowrap; }
 [data-testid="stSlider"] [data-baseweb="slider"] { padding-top:.4rem; }
 div[data-testid="stPlotlyChart"] { border:1px solid rgba(54,76,97,.72); border-radius:14px; overflow:hidden; background:rgba(9,17,27,.72); }
 .stButton>button, [data-testid="stDownloadButton"] button { border-radius:10px; font-weight:600; }
-small, .muted { color:var(--muted); }
+small, .muted, [data-testid="stCaption"] { color:var(--muted); line-height:1.6; }
 </style>
 """, unsafe_allow_html=True)
 
+def _stretch_layout(element):
+    """Use the modern width API when available, with a legacy fallback."""
+    try:
+        supports_width = "width" in inspect.signature(element).parameters
+    except (TypeError, ValueError):
+        supports_width = False
+    return {"width": "stretch"} if supports_width else {"use_container_width": True}
+
+
 SUSPECTS = ["الشبح", "الغايب", "المرتجف", "الظل"]
+
+
+def start_case_001() -> None:
+    st.session_state["case_001_started"] = True
+    st.session_state["doctor_dialogue_mode"] = "case_001"
+
+
+def announce_verdict(verdict: str) -> None:
+    st.session_state["doctor_announced_verdict"] = verdict
+    st.session_state["doctor_dialogue_mode"] = "verdict"
+
+
+def reset_doctor_dialogue() -> None:
+    st.session_state["doctor_dialogue_mode"] = "welcome"
+
+
+st.session_state.setdefault("doctor_dialogue_mode", "welcome")
+st.session_state.setdefault("case_001_started", False)
 
 st.sidebar.markdown("## 📡 طيف — TAYF")
 st.sidebar.caption("مختبر محاكاة وتحقيق لاسلكي — كل شيء هنا بيانات تعليمية مصطنعة")
-st.sidebar.markdown("---")
 st.sidebar.markdown("### إعداد مسرح الإشارة")
 suspect = st.sidebar.selectbox("سبب الحادث", SUSPECTS, index=0, help="غيّر المشتبه به وشاهد أثره فوراً على القياسات.")
 frequency = st.sidebar.slider("التردد الحامل (MHz)", 400, 6000, 2400, 100)
@@ -95,6 +140,8 @@ seed = st.sidebar.number_input("بذرة العشوائية", min_value=0, max_v
 st.sidebar.markdown("---")
 st.sidebar.caption("عدّل أي منزلق؛ تتحدث النتائج مباشرة من دون زر تشغيل أو إعادة تحميل يدوية.")
 st.sidebar.caption("لا يتصل التطبيق بأي شبكة حقيقية ولا يرسل أو يستقبل حزم Wi-Fi.")
+st.sidebar.markdown("---")
+doctor_slot = st.sidebar.container()
 
 params = LinkParams(
     tx_power_dbm=float(tx_power),
@@ -108,6 +155,30 @@ df = run_simulation(suspect, params, seed=int(seed), severity=float(severity_pct
 stats = compare_phases(df)
 verdict_data = rank_suspects(df)
 incident_rows = df[df["phase"] == "حادث"]
+metrics_spider = {
+    "power_drop": abs(min(0.0, stats["rssi_dbm"]["delta"])) / 25.0,
+    "snr_drop": abs(min(0.0, stats["snr_db"]["delta"])) / 25.0,
+    "fluctuation": min(1.0, max(0.0, (stats["rssi_dbm"]["std_ratio"] - 1.0) / 8.0)),
+    "drift": abs(min(0.0, stats["rssi_slope"])) / 0.8,
+    "packet_loss": stats["packet_loss_pct"]["incident_mean"] / 100.0,
+}
+
+doctor_mode = str(st.session_state["doctor_dialogue_mode"])
+announced_verdict = str(st.session_state.get("doctor_announced_verdict", verdict_data["verdict"]))
+doctor_message = doctor_dialogue(doctor_mode, announced_verdict)
+doctor_audio = f"/app/static/doctor_character/assets/audio/{doctor_audio_filename(doctor_mode, announced_verdict)}"
+doctor_url = "/app/static/doctor_character/index.html?" + urlencode({"mode": doctor_mode, "text": doctor_message, "audio": doctor_audio})
+with doctor_slot:
+    st.markdown("### مشرف التحقيق · د. محمد")
+    show_doctor_model = st.toggle("إظهار المساعد ثلاثي الأبعاد", value=True, key="show_doctor_model")
+    if show_doctor_model:
+        if hasattr(st, "iframe"):
+            st.iframe(doctor_url, height=390, alt="المشرف الأكاديمي د. محمد، مجسم ثلاثي الأبعاد متحرك")
+        else:
+            components.iframe(doctor_url, height=390, scrolling=False)
+        st.caption("انقر على الدكتور لتغيير زاوية الكاميرا، أو اسحب للتدوير. اضغط «استمع» لسماع رسالته.")
+    if doctor_mode != "welcome":
+        st.button("إعادة تحية المشرف", key="reset_doctor_dialogue", on_click=reset_doctor_dialogue, **_stretch_layout(st.button))
 
 st.markdown(f"""
 <div class="hero">
@@ -124,26 +195,32 @@ st.markdown(f"""
 </div>
 """, unsafe_allow_html=True)
 st.write("")
-current_step = st.slider("حرّك المؤشر الزمني داخل المحاكاة", 0, len(df) - 1, 25, 1, help="اسحب المؤشر لاستكشاف القياسات لحظة بلحظة.")
+current_step = st.slider("اختر لحظة القياس", 0, len(df) - 1, 25, 1, help="هذا المؤشر يحدّث بطاقات القياس وحالة التحقيق. التحديد داخل المخطط مخصص للاستكشاف والتكبير.")
 current = df.iloc[current_step]
 
-k1, k2, k3, k4 = st.columns(4)
-def metric_card(col, label: str, value: str, note: str):
-    col.markdown(f'<div class="metric"><div class="metric-label">{label}</div><div class="metric-value">{value}</div><div class="metric-note">{note}</div></div>', unsafe_allow_html=True)
-metric_card(k1, "قوة الإشارة RSSI", f"{current['rssi_dbm']:.1f} dBm", "القياس عند اللحظة المحددة")
-metric_card(k2, "نسبة الإشارة إلى الضوضاء", f"{current['snr_db']:.1f} dB", "SNR عند اللحظة المحددة")
-metric_card(k3, "فقدان الحزم", f"{current['packet_loss_pct']:.1f}%", "تقدير تعليمي من SNR")
-metric_card(k4, "درجة الحادث", f"{severity_pct}%", f"المشتبه المختار: {suspect}")
-st.write("")
+def metric_card(label: str, value: str, note: str) -> str:
+    return (
+        f'<article class="metric"><div class="metric-label">{escape(label)}</div>'
+        f'<div class="metric-value">{escape(value)}</div><div class="metric-note">{escape(note)}</div></article>'
+    )
 
-pages = st.tabs(["📡 غرفة العمليات", "🌐 خريطة التغطية", "🔭 مختبر QPSK و BER", "⚖️ ملف الأدلة", "📄 التقرير"])
+
+metrics_html = "".join([
+    metric_card("قوة الإشارة RSSI", f"{current['rssi_dbm']:.1f} dBm", "القياس عند اللحظة المحددة"),
+    metric_card("نسبة الإشارة إلى الضوضاء", f"{current['snr_db']:.1f} dB", "SNR عند اللحظة المحددة"),
+    metric_card("فقدان الحزم", f"{current['packet_loss_pct']:.1f}%", "تقدير تعليمي من SNR"),
+    metric_card("درجة الحادث", f"{severity_pct}%", f"المشتبه المختار: {suspect}"),
+])
+st.markdown(f'<section class="metrics-grid" aria-label="ملخص القياسات الحالية">{metrics_html}</section>', unsafe_allow_html=True)
+
+pages = st.tabs(["📡 العمليات", "📁 القضية 001", "🌐 التغطية", "🔭 QPSK / BER", "⚖️ الأدلة", "📄 التقرير"])
 with pages[0]:
     left, right = st.columns([1.7, 1])
     with left:
         st.markdown('<div class="section-kicker">SIGNAL TRACE / RSSI + SNR</div>', unsafe_allow_html=True)
         st.subheader("نبض الرابط عبر الزمن")
         fig = create_interactive_heartbeat(df, current_step=current_step)
-        st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": True, "scrollZoom": True, "displaylogo": False, "modeBarButtonsToRemove": ["lasso2d", "select2d"]})
+        st.plotly_chart(fig, **_stretch_layout(st.plotly_chart), config={"displayModeBar": True, "scrollZoom": True, "displaylogo": False, "modeBarButtonsToRemove": ["lasso2d", "select2d"]})
         st.caption("ظلّل المنطقة للتكبير، اسحب شريط الزمن أسفل المخطط، أو مرّر المؤشر على الخط لقراءة القيم. الشريط الأحمر الفاتح يحدد فترة الحادث.")
     with right:
         st.markdown('<div class="section-kicker">CASE STATUS</div>', unsafe_allow_html=True)
@@ -160,8 +237,51 @@ with pages[0]:
         phase_col1.metric("تغيّر RSSI", f"{stats['rssi_dbm']['delta']:+.1f} dB", help="المتوسط أثناء الحادث ناقص المتوسط الأساسي")
         phase_col2.metric("تغيّر SNR", f"{stats['snr_db']['delta']:+.1f} dB")
         st.markdown('<div class="verdict"><b>مهم:</b> التشخيص قاعدة تعليمية شفافة، وليس قياساً من شبكة فعلية.</div>', unsafe_allow_html=True)
+        st.caption("المشرف المتحرك حاضر في الشريط الجانبي؛ اختر ملف القضية أو الأدلة ليعلّق على التحقيق.")
+        st.session_state.setdefault("mentor_hint_level", 0)
+        mentor_text = mentor_guidance(
+            phase=str(current["phase"]),
+            rssi_delta=float(stats["rssi_dbm"]["delta"]),
+            snr_delta=float(stats["snr_db"]["delta"]),
+            rssi_std_ratio=float(stats["rssi_dbm"]["std_ratio"]),
+            hint_level=int(st.session_state["mentor_hint_level"]),
+        )
+        st.markdown(
+            f'<div class="mentor-card"><div class="mentor-head"><div class="mentor-avatar">د.م</div>'
+            f'<div><div class="mentor-name">د. محمد</div><span class="mentor-role">مشرف المختبر · مرشد تعليمي</span></div></div>'
+            f'<p class="mentor-note">{mentor_text}</p><div class="mentor-disclaimer">التوجيه مبني على بيانات المحاكاة الحالية، ولا يكشف التشخيص مباشرة.</div></div>',
+            unsafe_allow_html=True,
+        )
+        if st.button("تلميح آخر للمحقق", key="mentor_next_hint", **_stretch_layout(st.button)):
+            st.session_state["mentor_hint_level"] = (int(st.session_state["mentor_hint_level"]) + 1) % 3
+            st.rerun()
 
 with pages[1]:
+    st.markdown('<div class="section-kicker">CASE FILE / 001</div>', unsafe_allow_html=True)
+    st.subheader("ملف القضية 001 · انهيار الإشارة أثناء المحاضرة")
+    st.caption("بلاغ تعليمي داخل محاكاة طيف. ثبّت القضية ليبدأ الدكتور محمد بتسجيل إفادته.")
+    case_left, case_right = st.columns([1, 1.1])
+    with case_left:
+        st.markdown("#### بلاغ المشرف")
+        if not st.session_state["case_001_started"]:
+            st.info("القضية جاهزة للتثبيت. لا يُعرض البلاغ الكامل قبل بدء التحقيق.")
+            st.button("🔍 تثبيت بيانات القضية 001", key="start_case_001", on_click=start_case_001, **_stretch_layout(st.button))
+        else:
+            st.success("تم تثبيت البلاغ وفتح سجل القضية 001.")
+            case_quote = escape(doctor_dialogue("case_001"))
+            st.markdown(f'<div class="doctor-quote"><span>د. محمد · إفادة أولية</span><p>“{case_quote}”</p></div>', unsafe_allow_html=True)
+            st.button("إعادة تشغيل إفادة الدكتور", key="replay_case_001", on_click=start_case_001, **_stretch_layout(st.button))
+        st.markdown("#### مهمة المحقق")
+        st.write("قارن RSSI وSNR، راجع المجال المكاني، ثم انتقل إلى لوحة الأدلة لتوثيق السبب الأرجح.")
+        case_metric1, case_metric2 = st.columns(2)
+        case_metric1.metric("تغيّر RSSI", f"{stats['rssi_dbm']['delta']:+.1f} dB")
+        case_metric2.metric("تغيّر SNR", f"{stats['snr_db']['delta']:+.1f} dB")
+    with case_right:
+        st.markdown('<div class="section-kicker">EVIDENCE RADAR</div>', unsafe_allow_html=True)
+        st.plotly_chart(create_interactive_radar(metrics_spider, suspect_name=verdict_data["verdict"]), **_stretch_layout(st.plotly_chart), config={"displayModeBar": True}, key="case_001_radar")
+        st.caption("الرادار يلخّص هبوط القدرة وجودة الرابط والتذبذب وفقدان الحزم من بيانات المحاكاة الحالية.")
+
+with pages[2]:
     st.markdown('<div class="section-kicker">PROPAGATION FIELD</div>', unsafe_allow_html=True)
     st.subheader("استكشف المجال المكاني للرابط اللاسلكي")
     map_controls = st.columns([1, 1.35])
@@ -172,10 +292,10 @@ with pages[1]:
     map_severity = float(severity_pct) / 100.0
     map_metric = "SNR" if map_layer.startswith("SNR") else "RSSI"
     fig_map = create_rich_heatmap(params, suspect=suspect, incident_t=map_severity, view_mode=view_mode, metric=map_metric)
-    st.plotly_chart(fig_map, use_container_width=True, config={"displayModeBar": True, "scrollZoom": True, "displaylogo": False, "modeBarButtonsToRemove": ["lasso2d", "select2d"]})
+    st.plotly_chart(fig_map, **_stretch_layout(st.plotly_chart), config={"displayModeBar": True, "scrollZoom": True, "displaylogo": False, "modeBarButtonsToRemove": ["lasso2d", "select2d"]})
     st.caption("طبقة RSSI تعرض القدرة المستقبلة، وطبقة SNR تعرض أثر الضوضاء والتداخل على جودة الرابط. اسحب المجسم لتدويره أو حرّك المؤشر فوق الخريطة لقراءة القياس المكاني.")
 
-with pages[2]:
+with pages[3]:
     st.markdown('<div class="section-kicker">MODULATION LAB</div>', unsafe_allow_html=True)
     st.subheader("غيّر الضوضاء وشاهد الرموز تتشتت")
     c1, c2 = st.columns([1, 1])
@@ -188,14 +308,14 @@ with pages[2]:
     q1, q2 = st.columns(2)
     with q1:
         st.markdown("#### قبل الحادث")
-        st.plotly_chart(create_rich_constellation(baseline_snr, n_symbols=n_symbols, live_noise_amp=1.0, seed=int(seed)), use_container_width=True, config={"displayModeBar": True})
+        st.plotly_chart(create_rich_constellation(baseline_snr, n_symbols=n_symbols, live_noise_amp=1.0, seed=int(seed)), **_stretch_layout(st.plotly_chart), config={"displayModeBar": True})
     with q2:
         st.markdown("#### أثناء الحادث")
-        st.plotly_chart(create_rich_constellation(incident_snr, n_symbols=n_symbols, live_noise_amp=noise_amp, seed=int(seed) + 1), use_container_width=True, config={"displayModeBar": True})
+        st.plotly_chart(create_rich_constellation(incident_snr, n_symbols=n_symbols, live_noise_amp=noise_amp, seed=int(seed) + 1), **_stretch_layout(st.plotly_chart), config={"displayModeBar": True})
     st.markdown("#### ميزان أخطاء البت BER")
-    st.plotly_chart(create_interactive_ber(current_snr=incident_snr, baseline_snr=baseline_snr), use_container_width=True, config={"displayModeBar": True})
+    st.plotly_chart(create_interactive_ber(current_snr=incident_snr, baseline_snr=baseline_snr), **_stretch_layout(st.plotly_chart), config={"displayModeBar": True})
 
-with pages[3]:
+with pages[4]:
     st.markdown('<div class="section-kicker">EVIDENCE BOARD</div>', unsafe_allow_html=True)
     st.subheader("كيف استنتج النظام السبب؟")
     e1, e2 = st.columns([1.1, 1])
@@ -207,28 +327,24 @@ with pages[3]:
             {"المقياس": "RSSI (dBm)", "قبل الحادث": stats["rssi_dbm"]["baseline_mean"], "أثناء الحادث": stats["rssi_dbm"]["incident_mean"], "التغير": stats["rssi_dbm"]["delta"]},
             {"المقياس": "SNR (dB)", "قبل الحادث": stats["snr_db"]["baseline_mean"], "أثناء الحادث": stats["snr_db"]["incident_mean"], "التغير": stats["snr_db"]["delta"]},
         ])
-        st.dataframe(comparison, use_container_width=True, hide_index=True)
+        st.dataframe(comparison, **_stretch_layout(st.dataframe), hide_index=True)
     with e2:
         verdict = verdict_data["verdict"]
         st.markdown(f'<div class="verdict"><div class="section-kicker">MOST LIKELY CAUSE</div><h2>{verdict}</h2><p>درجة مطابقة الأدلة: <b>{verdict_data["confidence"]}%</b></p></div>', unsafe_allow_html=True)
+        verdict_quote = escape(doctor_dialogue("verdict", verdict))
+        st.markdown(f'<div class="doctor-quote"><span>د. محمد · تعليق على الحكم</span><p>“{verdict_quote}”</p></div>', unsafe_allow_html=True)
+        st.button("🔊 اجعل الدكتور يعلن الحكم", key="announce_case_verdict", on_click=announce_verdict, args=(verdict,), **_stretch_layout(st.button))
         scores = pd.DataFrame(verdict_data["ranked"], columns=["المشتبه", "درجة المطابقة %"])
         st.bar_chart(scores.set_index("المشتبه"), horizontal=True, height=250, color="#52e0d1")
-        metrics_spider = {
-            "power_drop": abs(min(0.0, stats["rssi_dbm"]["delta"])) / 25.0,
-            "snr_drop": abs(min(0.0, stats["snr_db"]["delta"])) / 25.0,
-            "fluctuation": min(1.0, max(0.0, (stats["rssi_dbm"]["std_ratio"] - 1.0) / 8.0)),
-            "drift": abs(min(0.0, stats["rssi_slope"])) / 0.8,
-            "packet_loss": stats["packet_loss_pct"]["incident_mean"] / 100.0,
-        }
-        st.plotly_chart(create_interactive_radar(metrics_spider, suspect_name=verdict), use_container_width=True, config={"displayModeBar": True})
+        st.plotly_chart(create_interactive_radar(metrics_spider, suspect_name=verdict), **_stretch_layout(st.plotly_chart), config={"displayModeBar": True}, key="evidence_radar")
 
-with pages[4]:
+with pages[5]:
     st.markdown('<div class="section-kicker">CASE REPORT</div>', unsafe_allow_html=True)
     st.subheader("ملف القضية الحالي")
     report_text = generate_case_summary_text(df, verdict_data)
     st.text_area("التقرير النصي", report_text, height=300)
     d1, d2 = st.columns(2)
     with d1:
-        st.download_button("تنزيل التقرير النصي", report_text, file_name="TAYF_case_report.txt", mime="text/plain", use_container_width=True)
+        st.download_button("تنزيل التقرير النصي", report_text, file_name="TAYF_case_report.txt", mime="text/plain", **_stretch_layout(st.download_button))
     with d2:
-        st.download_button("تنزيل القياسات CSV", export_dataframe_csv(df), file_name="TAYF_signal_measurements.csv", mime="text/csv", use_container_width=True)
+        st.download_button("تنزيل القياسات CSV", export_dataframe_csv(df), file_name="TAYF_signal_measurements.csv", mime="text/csv", **_stretch_layout(st.download_button))

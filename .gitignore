@@ -9,9 +9,11 @@ __pycache__/
 env/
 venv/
 ENV/
+node_modules/
 
-# Streamlit Local Cache
-.streamlit/
+# Streamlit Local Cache (keep the shared static-serving config in version control)
+.streamlit/*
+!.streamlit/config.toml
 
 # OS Specific
 .DS_Store
@@ -19,4 +21,3 @@ Thumbs.db
 
 # Project generated temp reports
 *.tmp
-
