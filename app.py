@@ -1,6 +1,7 @@
 """
 طيف — TAYF
-تطبيق غرفة التحقيق الجنائي في الإشارات اللاسلكية — النسخة التفاعلية والحركية
+تطبيق غرفة التحقيق الجنائي في الإشارات اللاسلكية — النسخة التفاعلية والحركية الشاملة
+تم التخلص نهائياً من أي صور ثابتة، واستبدالها بمجسمات ومخططات Plotly + Canvas تفاعلية وحركية
 """
 import streamlit as st
 import numpy as np
@@ -21,12 +22,12 @@ from analysis.evidence import extract_evidence
 from analysis.diagnosis import rank_suspects
 from visualization.interactive_oscilloscope import create_interactive_heartbeat
 from visualization.cinematic_heartbeat import get_cinematic_ecg_html
-from visualization.interactive_heatmap import create_interactive_heatmap
-import streamlit.components.v1 as components
-from visualization.interactive_constellation import create_interactive_constellation
-from visualization.ber_curve import plot_ber_curve
-from visualization.fingerprint import plot_fingerprint
+from visualization.interactive_heatmap import create_rich_heatmap
+from visualization.interactive_constellation import create_rich_constellation
+from visualization.interactive_ber import create_interactive_ber
+from visualization.interactive_radar import create_interactive_radar
 from reporting.report_generator import generate_case_summary_text, export_dataframe_csv
+import streamlit.components.v1 as components
 
 # إعداد الصفحة وتصميم الـ Dark Cyber / Forensics
 st.set_page_config(
@@ -36,7 +37,7 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Custom CSS بطابع أمني عربي داكن نيون
+# Custom CSS بطابع أمني عربي داكن نيون احترافي
 st.markdown("""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Tajawal:wght@400;700;900&display=swap');
@@ -48,21 +49,27 @@ st.markdown("""
     }
     
     .stApp {
-        background-color: #0b0c10;
+        background-color: #050b14;
         color: #c5c6c7;
     }
     
     .stSidebar {
-        background-color: #151a21;
+        background-color: #0b111e;
+        border-left: 1px solid #162032;
     }
     
     .metric-card {
-        background: linear-gradient(135deg, #1f2833 0%, #0b0c10 100%);
-        border: 1px solid #45a29e;
+        background: linear-gradient(135deg, #0d1527 0%, #050b14 100%);
+        border: 1px solid rgba(0, 240, 255, 0.3);
         border-radius: 12px;
         padding: 18px;
         text-align: center;
-        box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+        box-shadow: 0 4px 15px rgba(0,0,0,0.6);
+        transition: transform 0.2s ease, border-color 0.2s ease;
+    }
+    .metric-card:hover {
+        transform: translateY(-4px);
+        border-color: #00f0ff;
     }
     
     .verdict-box {
@@ -76,13 +83,21 @@ st.markdown("""
     }
 
     .evidence-badge {
-        background-color: #14171f;
+        background-color: #0d1527;
         border-right: 4px solid #ff1744;
         padding: 12px 18px;
         margin-bottom: 10px;
         border-radius: 6px;
         font-size: 1.05rem;
-        box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+        box-shadow: 0 2px 8px rgba(0,0,0,0.4);
+    }
+
+    /* أزرار تفاعلية فخمة */
+    .stButton>button {
+        font-family: 'Tajawal', sans-serif;
+        font-weight: 700;
+        border-radius: 8px;
+        transition: all 0.25s ease;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -97,10 +112,13 @@ if "mystery_mode" not in st.session_state:
 if "mystery_actual" not in st.session_state:
     st.session_state.mystery_actual = None
 
-# القائمة الجانبية للتنقل بين أدوات المختبر
-st.sidebar.image("https://img.icons8.com/nolan/96/radar.png", width=70)
-st.sidebar.title("طيف 📡 TAYF")
-st.sidebar.caption("كل إشارة بتخلّف جريمة | مختبر الأدلة الجنائية")
+# القائمة الجانبية
+st.sidebar.markdown("""
+<div style="text-align: center; padding: 10px 0;">
+    <h2 style="color: #00f0ff; margin-bottom: 2px;">📡 طيف — TAYF</h2>
+    <p style="color: #94a3b8; font-size: 0.85rem;">مختبر التحقيق الجنائي في الإشارات</p>
+</div>
+""", unsafe_allow_html=True)
 
 tool_page = st.sidebar.radio(
     "أدوات غرفة التحقيق:",
@@ -109,8 +127,8 @@ tool_page = st.sidebar.radio(
         "📁 ملف الحالة 001 (د. محمد رسمي)",
         "⚙️ محاكي مسرح الترددات",
         "📡 راسم الذبذبات الحي (Live ECG)",
-        "🌡️ خريطة التغطية الحرارية",
-        "🔭 كوكبة QPSK (بصمة الجريمة)",
+        "🌡️ خريطة التغطية اللاسلكية (2D / 3D)",
+        "🔭 كوكبة QPSK التفاعلية",
         "📈 ميزان الجريمة (BER)",
         "⚖️ لوحة الأدلة وحكم المحقق",
         "📄 تقرير القضية الرسمي"
@@ -139,7 +157,7 @@ df = st.session_state.df_sim
 if tool_page == "🚪 غرفة العمليات (الرئيسية)":
     st.title("📡 طيف — مختبر التحقيق الجنائي في الإشارات اللاسلكية")
     st.markdown("""
-    > **القضية باختصار:** إشارة لاسلكية اتقتلت وتدهورت جودتها بشكل مباغت. 
+    > **القضية باختصار:** إشارة لاسلكية اتقتلت وتدهورت جودتها بشكل مباغت في مسرح الاتصال. 
     > مهمتك كمحقق هي جمع القرائن الفيزيائية ومعرفة **مين قتل الإشارة؟**
     """)
     
@@ -210,17 +228,20 @@ elif tool_page == "📁 ملف الحالة 001 (د. محمد رسمي)":
     **السؤال الجوهري:** إذا كانت الإشارة قوية.. ليش الاتصال ميت؟
     """)
     
-    if st.button("🔍 تثبيت بيانات القضية 001 في المختبر", type="primary", use_container_width=True):
-        st.session_state.df_sim = run_simulation("الشبح", default_params, seed=101)
-        st.session_state.current_suspect = "الشبح"
-        st.session_state.mystery_mode = False
-        st.success("✅ البيانات جاهزة للفحص في كل شاشات المختبر الآن!")
+    col_btn1, col_btn2 = st.columns(2)
+    with col_btn1:
+        if st.button("🔍 تثبيت بيانات القضية 001 في المختبر", type="primary", use_container_width=True):
+            st.session_state.df_sim = run_simulation("الشبح", default_params, seed=101)
+            st.session_state.current_suspect = "الشبح"
+            st.session_state.mystery_mode = False
+            st.success("✅ البيانات جاهزة للفحص في كل شاشات المختبر الآن!")
+    with col_btn2:
+        if st.button("⚡ إعادة ضبط ومعايرة الشبكة", use_container_width=True):
+            st.session_state.df_sim = run_simulation("الشبح", default_params, seed=101)
 
     if st.session_state.df_sim is not None:
         st.write("---")
         st.subheader("🎬 نبضة قلب شبكة د. محمد (رادار حي 60 FPS):")
-        
-        # استخراج بيانات RSSI و SNR للرادار السينمائي
         df_target = st.session_state.df_sim
         rssi_list = [float(v) for v in df_target["rssi_dbm"].values]
         snr_list = [float(v) for v in df_target["snr_db"].values]
@@ -229,7 +250,7 @@ elif tool_page == "📁 ملف الحالة 001 (د. محمد رسمي)":
         ecg_html = get_cinematic_ecg_html(rssi_list, snr_list, is_incident=is_inc)
         components.html(ecg_html, height=440)
         
-        with st.expander("📊 عرض المخطط الإحصائي التفاعلي المتقدم (Plotly)"):
+        with st.expander("📊 تحليل إحصائي تفاعلي متقدم (Plotly Scope)"):
             fig_inter = create_interactive_heartbeat(st.session_state.df_sim)
             st.plotly_chart(fig_inter, use_container_width=True)
 
@@ -265,13 +286,12 @@ elif tool_page == "⚙️ محاكي مسرح الترددات":
             st.success(f"تم تنفيذ حادث 【 {suspect_choice} 】 وتوليد 50 ثانية من القياسات الدقيقة!")
 
 # ========================================================
-# 4. راسم الذبذبات الحي (Live ECG Animation)
+# 4. راسم الذبذبات الحي
 # ========================================================
 elif tool_page == "📡 راسم الذبذبات الحي (Live ECG)":
     st.title("📡 راسم الذبذبات الحي — نبضة قلب الإشارة السينمائية")
     st.write("مراقبة حية وتدفق مستمر لسلوك قوة الإشارة (RSSI) مقابل نسبة الضوضاء (SNR) بمعدل 60 إطار بالثانية:")
 
-    # عرض الرادار السينمائي الحي المستمر
     rssi_list = [float(v) for v in df["rssi_dbm"].values]
     snr_list = [float(v) for v in df["snr_db"].values]
     is_inc = bool(st.session_state.current_suspect != "طبيعي")
@@ -280,7 +300,7 @@ elif tool_page == "📡 راسم الذبذبات الحي (Live ECG)":
     components.html(ecg_html, height=440)
 
     st.write("---")
-    st.subheader("🕹️ محاكي النبض الزمني التفاعلي:")
+    st.subheader("🕹️ محاكي التدفق الزمني التفاعلي:")
     c1, c2, c3 = st.columns([1.2, 1, 2])
     with c1:
         start_anim = st.button("▶️ تشغيل محاكاة التدفق بالثواني", type="primary")
@@ -291,7 +311,6 @@ elif tool_page == "📡 راسم الذبذبات الحي (Live ECG)":
     status_placeholder = st.empty()
 
     if start_anim:
-        # حلقة تدفق حية متحركة قدام الدكتور ثانية بثانية!
         for step_idx in range(4, len(df), 2):
             fig_anim = create_interactive_heartbeat(df, current_step=step_idx)
             chart_placeholder.plotly_chart(fig_anim, use_container_width=True, key=f"anim_{step_idx}")
@@ -305,55 +324,55 @@ elif tool_page == "📡 راسم الذبذبات الحي (Live ECG)":
             </div>
             """, unsafe_allow_html=True)
             time.sleep(0.06)
-        # العرض النهائي
         fig_final = create_interactive_heartbeat(df)
         chart_placeholder.plotly_chart(fig_final, use_container_width=True)
     else:
         fig_static = create_interactive_heartbeat(df)
         chart_placeholder.plotly_chart(fig_static, use_container_width=True)
 
-    st.markdown("""
-    **💡 كيف تشرحها للدكتور بالعرض؟**
-    - اضغط على **`▶️ تشغيل النبض المتحرك الحي`** وخلي الرسم يتدفق قدام عيونه ثانية بثانية!
-    - عند **الثانية 20** رح يدخل الحادث فجأة، وركزله كيف الـ RSSI والـ SNR بيتحركوا بشكل حي.
-    - المخطط تفاعلي بالكامل: بتقدر تكبّر (Zoom)، تعمل Pan، أو تقرأ أي نقطة بدقة.
-    """)
-
 # ========================================================
-# 5. خريطة التغطية الحرارية التفاعلية
+# 5. خريطة التغطية اللاسلكية (2D / 3D)
 # ========================================================
-elif tool_page == "🌡️ خريطة التغطية الحرارية":
-    st.title("🌡️ خريطة مسح التغطية اللاسلكية التفاعلية")
+elif tool_page == "🌡️ خريطة التغطية اللاسلكية (2D / 3D)":
+    st.title("🌡️ خريطة مسح التغطية اللاسلكية — 2D & 3D Interactive")
     st.write("توزع مستويات القدرة في الفضاء المحيط بالمرسل بالاعتماد على معادلة الفضاء الحر (FSPL):")
     
-    col_t1, col_t2 = st.columns([2, 1])
-    with col_t1:
-        t_val = st.slider("🎚️ تحكم بشدة وزحف الحادث في المكان (تفاعلي):", 0.0, 1.0, 0.85, 0.05)
-    with col_t2:
-        st.metric("شدة الحادث الحالية", f"{t_val*100:.0f}%", delta=f"{t_val*20:.1f} dB فقدان")
+    col_ctrl1, col_ctrl2, col_ctrl3 = st.columns([1.5, 1.5, 1])
+    with col_ctrl1:
+        view_mode = st.radio("نمط العرض المرئي:", ["2D الخريطة الرادارية", "3D المجسم الطيفي"], horizontal=True)
+    with col_ctrl2:
+        t_val = st.slider("🎚️ تحكم بشدة وزحف الحادث في المكان:", 0.0, 1.0, 0.85, 0.05)
+    with col_ctrl3:
+        st.metric("شدة الحادث", f"{t_val*100:.0f}%", delta=f"{t_val*20:.1f} dB فقد")
 
-    fig_hm = create_interactive_heatmap(default_params, suspect=st.session_state.current_suspect, incident_t=t_val)
+    fig_hm = create_rich_heatmap(default_params, suspect=st.session_state.current_suspect, incident_t=t_val, view_mode=view_mode)
     st.plotly_chart(fig_hm, use_container_width=True)
-    st.caption("✨ حرك الماوس فوق أي نقطة على الخريطة لقراءة المسافة الدقيقة وقوة الإشارة بوحدة dBm.")
+    st.caption("✨ في نمط 3D، يمكنك تدوير المجسم وتكبيره وتفحصه من أي زاوية بحرية كاملة بالماوس!")
 
 # ========================================================
 # 6. كوكبة QPSK التفاعلية
 # ========================================================
-elif tool_page == "🔭 كوكبة QPSK (بصمة الجريمة)":
-    st.title("🔭 كوكبة QPSK التفاعلية — بصمة الجريمة")
+elif tool_page == "🔭 كوكبة QPSK التفاعلية":
+    st.title("🔭 كوكبة QPSK التفاعلية — بصمة الجريمة الحية")
     st.write("كل نقطة تمثل رمزاً مشفراً تم استقباله. انتشار وتشتت النقاط يثبت تشوه الإشارة بواسطة الضوضاء والتداخل:")
     
-    col1, col2 = st.columns(2)
-    base_snr = df[df["phase"] == "أساسي"]["snr_db"].mean()
+    col_k1, col_k2 = st.columns([2, 1])
+    with col_k1:
+        noise_amp = st.slider("🎛️ مضخم الضوضاء الحي (Real-time Noise Injection):", 0.5, 3.0, 1.0, 0.1)
+    with col_k2:
+        n_syms = st.slider("عدد الرموز المرصودة:", 200, 800, 450, 50)
+
     inc_snr = df[df["phase"] == "حادث"]["snr_db"].mean()
-    
-    with col1:
+    base_snr = df[df["phase"] == "أساسي"]["snr_db"].mean()
+
+    col_box1, col_box2 = st.columns(2)
+    with col_box1:
         st.subheader("قبل الحادث (طبيعي ومحكم)")
-        fig_c1 = create_interactive_constellation(base_snr)
+        fig_c1 = create_rich_constellation(base_snr, n_symbols=n_syms, live_noise_amp=1.0)
         st.plotly_chart(fig_c1, use_container_width=True)
-    with col2:
+    with col_box2:
         st.subheader("أثناء الحادث (تشتت وانهيار الرموز)")
-        fig_c2 = create_interactive_constellation(inc_snr)
+        fig_c2 = create_rich_constellation(inc_snr, n_symbols=n_syms, live_noise_amp=noise_amp)
         st.plotly_chart(fig_c2, use_container_width=True)
 
 # ========================================================
@@ -365,8 +384,9 @@ elif tool_page == "📈 ميزان الجريمة (BER)":
     
     base_snr = df[df["phase"] == "أساسي"]["snr_db"].mean()
     inc_snr = df[df["phase"] == "حادث"]["snr_db"].mean()
-    fig_ber = plot_ber_curve(current_snr=inc_snr, baseline_snr=base_snr)
-    st.pyplot(fig_ber)
+    
+    fig_ber = create_interactive_ber(current_snr=inc_snr, baseline_snr=base_snr)
+    st.plotly_chart(fig_ber, use_container_width=True)
 
 # ========================================================
 # 8. لوحة الأدلة وحكم المحقق
@@ -384,7 +404,7 @@ elif tool_page == "⚖️ لوحة الأدلة وحكم المحقق":
             st.markdown(f"""
             <div class="evidence-badge">
                 <strong>{ev['emoji']} {ev['text']}</strong><br>
-                <small style="color: #45a29e;">الدلالة الفيزيائية: تدعم اتهام المشتبه به 【 {ev['supports']} 】</small>
+                <small style="color: #00f0ff;">الدلالة الفيزيائية: تدعم اتهام المشتبه به 【 {ev['supports']} 】</small>
             </div>
             """, unsafe_allow_html=True)
             
@@ -398,8 +418,8 @@ elif tool_page == "⚖️ لوحة الأدلة وحكم المحقق":
             "drift": abs(min(0.0, stats["rssi_slope"])) / 0.8,
             "packet_loss": stats["packet_loss_pct"]["incident_mean"] / 100.0,
         }
-        fig_fp = plot_fingerprint(metrics_spider, suspect_name=verdict_data["verdict"])
-        st.pyplot(fig_fp)
+        fig_radar = create_interactive_radar(metrics_spider, suspect_name=verdict_data["verdict"])
+        st.plotly_chart(fig_radar, use_container_width=True)
 
     with col_vd:
         st.subheader("⚖️ الحكم الجنائي الصادر:")
@@ -422,7 +442,7 @@ elif tool_page == "⚖️ لوحة الأدلة وحكم المحقق":
 
         if st.session_state.mystery_mode:
             st.write("---")
-            if st.button("🔓 كشف الحقيقة (المجرم الحقيقي في وضع الغموض)"):
+            if st.button("🔓 كشف الحقيقة (المجرم الحقيقي في وضع الغموض)", type="primary"):
                 actual = st.session_state.mystery_actual
                 if actual == verdict:
                     st.balloons()
