@@ -39,11 +39,30 @@ html, body, [class*="css"], [data-testid="stAppViewContainer"] { font-family:'IB
 [data-testid="stSidebar"] { background:linear-gradient(180deg,#0b1622,#09111a); border-left:1px solid var(--line); }
 .block-container { max-width:1500px; padding-top:1.35rem; padding-bottom:3rem; }
 h1,h2,h3 { letter-spacing:-.02em; }
-.hero { border:1px solid #294154; border-radius:18px; padding:22px 26px; background:linear-gradient(115deg,rgba(16,42,57,.92),rgba(10,20,31,.86)); position:relative; overflow:hidden; }
-.hero:after { content:''; position:absolute; left:-35px; top:-65px; width:210px; height:210px; border:1px solid rgba(82,224,209,.18); border-radius:50%; box-shadow:0 0 0 24px rgba(82,224,209,.035),0 0 0 50px rgba(82,224,209,.025); }
-.eyebrow { color:var(--cyan); font-size:.82rem; letter-spacing:.12em; font-weight:700; }
-.hero h1 { margin:.3rem 0 .35rem; font-size:2rem; }
-.hero p { margin:0; color:#aebdce; max-width:760px; }
+.hero { border:1px solid #294154; border-radius:20px; padding:24px 28px; background:linear-gradient(112deg,rgba(16,42,57,.96),rgba(10,20,31,.94) 62%,rgba(11,25,36,.96)); position:relative; overflow:hidden; box-shadow:0 18px 55px rgba(0,0,0,.17); }
+.hero-layout { display:grid; grid-template-columns:minmax(0,1fr) 190px; gap:22px; align-items:center; }
+.hero-copy { position:relative; z-index:1; }
+.hero-topline { display:flex; align-items:center; gap:9px; color:#9fb2c4; font-size:.78rem; font-weight:600; }
+.live-dot { width:8px; height:8px; border-radius:50%; background:var(--cyan); box-shadow:0 0 0 4px rgba(82,224,209,.12),0 0 14px rgba(82,224,209,.8); animation:live-pulse 1.8s ease-in-out infinite; }
+.hero h1 { margin:.55rem 0 .45rem; font-size:2.25rem; line-height:1.2; font-weight:700; }
+.hero h1 .brand-word { color:var(--cyan); font-size:2.55rem; }
+.hero p { margin:0; color:#aebdce; max-width:680px; font-size:1rem; line-height:1.8; }
+.hero-meta { display:flex; flex-wrap:wrap; gap:8px; margin-top:15px; }
+.hero-meta span { border:1px solid rgba(93,132,157,.35); background:rgba(9,20,30,.55); border-radius:99px; color:#b7c8d8; padding:5px 10px; font-size:.74rem; }
+.hero-visual { height:164px; display:grid; place-items:center; position:relative; }
+.radar { width:142px; height:142px; position:relative; overflow:hidden; border-radius:50%; border:1px solid rgba(82,224,209,.42); background:radial-gradient(circle,rgba(82,224,209,.13) 0 2px,transparent 3px),repeating-radial-gradient(circle,transparent 0 21px,rgba(82,224,209,.16) 22px 23px),linear-gradient(90deg,transparent 49.5%,rgba(82,224,209,.14) 50%,transparent 50.5%),linear-gradient(0deg,transparent 49.5%,rgba(82,224,209,.14) 50%,transparent 50.5%); box-shadow:0 0 38px rgba(82,224,209,.12),inset 0 0 25px rgba(82,224,209,.08); }
+.radar-sweep { position:absolute; inset:0; border-radius:50%; background:conic-gradient(from 0deg,transparent 0 78%,rgba(82,224,209,.02) 83%,rgba(82,224,209,.28) 100%); animation:radar-rotate 5s linear infinite; }
+.radar-center { position:absolute; width:7px; height:7px; border-radius:50%; background:#e7fff9; left:calc(50% - 3.5px); top:calc(50% - 3.5px); box-shadow:0 0 15px 5px rgba(82,224,209,.54); }
+.radar-contact { position:absolute; width:5px; height:5px; border-radius:50%; background:var(--amber); box-shadow:0 0 9px 2px rgba(255,189,105,.6); animation:contact-blink 2.2s ease-in-out infinite; }
+.radar-contact.one { top:29%; left:65%; } .radar-contact.two { top:66%; left:32%; animation-delay:.8s; }
+.hero-wave { position:absolute; bottom:0; left:0; width:100%; height:36px; opacity:.42; }
+.hero-wave path { fill:none; stroke:var(--cyan); stroke-width:1.5; stroke-dasharray:8 9; animation:wave-flow 7s linear infinite; }
+@keyframes radar-rotate { to { transform:rotate(360deg); } }
+@keyframes live-pulse { 50% { opacity:.45; box-shadow:0 0 0 7px rgba(82,224,209,.04),0 0 17px rgba(82,224,209,.35); } }
+@keyframes contact-blink { 50% { opacity:.3; transform:scale(.7); } }
+@keyframes wave-flow { to { stroke-dashoffset:-68; } }
+@media (max-width:760px) { .hero-layout { grid-template-columns:1fr 92px; gap:8px; } .radar { width:84px; height:84px; } .hero { padding:18px; } .hero h1 { font-size:1.65rem; } .hero h1 .brand-word { font-size:1.9rem; } .hero p { font-size:.88rem; } .hero-visual { height:105px; } }
+@media (prefers-reduced-motion:reduce) { *, *::before, *::after { animation-duration:.01ms !important; animation-iteration-count:1 !important; scroll-behavior:auto !important; } }
 .metric { background:linear-gradient(145deg,rgba(17,32,47,.96),rgba(10,18,28,.96)); border:1px solid var(--line); border-radius:14px; padding:14px 16px; min-height:108px; }
 .metric-label { color:var(--muted); font-size:.82rem; }
 .metric-value { color:var(--ink); font-size:1.75rem; font-weight:700; margin-top:7px; direction:ltr; text-align:right; }
@@ -88,11 +107,18 @@ stats = compare_phases(df)
 verdict_data = rank_suspects(df)
 incident_rows = df[df["phase"] == "حادث"]
 
-st.markdown("""
+st.markdown(f"""
 <div class="hero">
-  <div class="eyebrow">WIRELESS FORENSICS · INTERACTIVE SIMULATION</div>
-  <h1>طيف | غرفة التحقيق اللاسلكي</h1>
-  <p>غيّر خصائص الرابط من اللوحة الجانبية، راقب لحظة وقوع الحادث، ثم تتبّع الأدلة التي قادت إلى التشخيص.</p>
+  <div class="hero-layout">
+    <div class="hero-copy">
+      <div class="hero-topline"><span class="live-dot"></span><span>مختبر مراقبة وتحليل الإشارات</span><span>·</span><span>محاكاة مباشرة</span></div>
+      <h1><span class="brand-word">طيف</span> <span style="color:#d9e4ee">/ غرفة التحقيق</span></h1>
+      <p>اتبع أثر الإشارة من لحظة استقرارها إلى وقوع الحادث. عدّل خصائص الرابط، راقب التغيّر، ثم اجمع القرائن لتعرف السبب.</p>
+      <div class="hero-meta"><span>القناة {frequency:,} MHz</span><span>المسافة {distance_m} m</span><span>المشتبه: {suspect}</span><span>شدة {severity_pct}%</span></div>
+    </div>
+    <div class="hero-visual" aria-hidden="true"><div class="radar"><div class="radar-sweep"></div><div class="radar-center"></div><div class="radar-contact one"></div><div class="radar-contact two"></div></div></div>
+  </div>
+  <svg class="hero-wave" viewBox="0 0 1200 36" preserveAspectRatio="none" aria-hidden="true"><path d="M0 20h120l8-2 7 4 12-2h45l8-12 8 25 10-16 8 5h95l8-2 6 3h65l8-17 8 27 10-14 8 4h118l8-2 7 4h112l8-10 8 17 10-9h126l8-2 7 3h170"/></svg>
 </div>
 """, unsafe_allow_html=True)
 st.write("")
@@ -115,8 +141,8 @@ with pages[0]:
         st.markdown('<div class="section-kicker">SIGNAL TRACE / RSSI + SNR</div>', unsafe_allow_html=True)
         st.subheader("نبض الرابط عبر الزمن")
         fig = create_interactive_heartbeat(df, current_step=current_step)
-        st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": True, "scrollZoom": True})
-        st.caption("اسحب داخل المخطط للتكبير، مرّر المؤشر على النقاط لقراءة القياسات، أو استخدم منزلق الزمن أعلاه.")
+        st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": True, "scrollZoom": True, "displaylogo": False, "modeBarButtonsToRemove": ["lasso2d", "select2d"]})
+        st.caption("ظلّل المنطقة للتكبير، اسحب شريط الزمن أسفل المخطط، أو مرّر المؤشر على الخط لقراءة القيم. الشريط الأحمر الفاتح يحدد فترة الحادث.")
     with right:
         st.markdown('<div class="section-kicker">CASE STATUS</div>', unsafe_allow_html=True)
         st.subheader("حالة مسرح الإشارة")
@@ -135,12 +161,17 @@ with pages[0]:
 
 with pages[1]:
     st.markdown('<div class="section-kicker">PROPAGATION FIELD</div>', unsafe_allow_html=True)
-    st.subheader("استكشف توزيع القدرة حول المرسل")
-    view_mode = st.radio("طريقة الاستكشاف", ["2D الخريطة الرادارية", "3D المجسم الطيفي"], horizontal=True)
+    st.subheader("استكشف المجال المكاني للرابط اللاسلكي")
+    map_controls = st.columns([1, 1.35])
+    with map_controls[0]:
+        view_mode = st.radio("طريقة العرض", ["2D الخريطة الرادارية", "3D المجسم الطيفي"], horizontal=True)
+    with map_controls[1]:
+        map_layer = st.radio("طبقة القياس", ["RSSI · قوة الإشارة", "SNR · جودة الرابط"], horizontal=True)
     map_severity = float(severity_pct) / 100.0
-    fig_map = create_rich_heatmap(params, suspect=suspect, incident_t=map_severity, view_mode=view_mode)
-    st.plotly_chart(fig_map, use_container_width=True, config={"displayModeBar": True, "scrollZoom": True})
-    st.caption("في وضع 3D اسحب لتدوير السطح واستخدم التكبير لاستكشاف مناطق التغطية. حرّك إعدادات الرابط من اللوحة الجانبية لتحديث الخريطة.")
+    map_metric = "SNR" if map_layer.startswith("SNR") else "RSSI"
+    fig_map = create_rich_heatmap(params, suspect=suspect, incident_t=map_severity, view_mode=view_mode, metric=map_metric)
+    st.plotly_chart(fig_map, use_container_width=True, config={"displayModeBar": True, "scrollZoom": True, "displaylogo": False, "modeBarButtonsToRemove": ["lasso2d", "select2d"]})
+    st.caption("طبقة RSSI تعرض القدرة المستقبلة، وطبقة SNR تعرض أثر الضوضاء والتداخل على جودة الرابط. اسحب المجسم لتدويره أو حرّك المؤشر فوق الخريطة لقراءة القياس المكاني.")
 
 with pages[2]:
     st.markdown('<div class="section-kicker">MODULATION LAB</div>', unsafe_allow_html=True)
