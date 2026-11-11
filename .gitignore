@@ -1,0 +1,21 @@
+# Python Cache & Bytecode
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Environments
+.venv/
+env/
+venv/
+ENV/
+
+# Streamlit Local Cache
+.streamlit/
+
+# OS Specific
+.DS_Store
+Thumbs.db
+
+# Project generated temp reports
+*.tmp
