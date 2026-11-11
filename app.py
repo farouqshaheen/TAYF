@@ -22,6 +22,8 @@ from visualization.interactive_constellation import create_rich_constellation
 from visualization.interactive_heatmap import create_rich_heatmap
 from visualization.interactive_oscilloscope import create_interactive_heartbeat
 from visualization.interactive_radar import create_interactive_radar
+from visualization.doctor_3d_component import get_doctor_3d_html
+import streamlit.components.v1 as components
 
 st.set_page_config(
     page_title="طيف | مختبر الإشارات اللاسلكية",
