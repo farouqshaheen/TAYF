@@ -7,6 +7,7 @@ import sys
 import numpy as np
 import pandas as pd
 import streamlit as st
+import streamlit.components.v1 as components
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 if BASE_DIR not in sys.path:
@@ -14,6 +15,7 @@ if BASE_DIR not in sys.path:
 
 from analysis.diagnosis import rank_suspects
 from analysis.metrics import compare_phases
+from analysis.mentor import mentor_guidance
 from reporting.report_generator import export_dataframe_csv, generate_case_summary_text
 from simulation.data_generator import run_simulation
 from simulation.scenarios import LinkParams
@@ -71,6 +73,13 @@ h1,h2,h3 { letter-spacing:-.02em; }
 .metric-note { color:#8aa0b6; font-size:.75rem; margin-top:3px; }
 .section-kicker { color:var(--cyan); font-size:.8rem; font-weight:700; letter-spacing:.08em; }
 .verdict { border:1px solid rgba(255,189,105,.45); background:linear-gradient(135deg,rgba(82,50,20,.3),rgba(16,25,36,.9)); border-radius:14px; padding:16px 19px; }
+.mentor-card { border:1px solid rgba(82,224,209,.28); border-radius:14px; padding:14px; margin-top:10px; background:linear-gradient(145deg,rgba(15,38,49,.92),rgba(10,20,31,.96)); box-shadow:inset 0 1px rgba(255,255,255,.025); }
+.mentor-head { display:flex; align-items:center; gap:11px; margin-bottom:11px; }
+.mentor-avatar { display:grid; place-items:center; width:44px; height:44px; flex:0 0 44px; border:1px solid rgba(82,224,209,.42); border-radius:50%; background:radial-gradient(circle at 35% 28%,rgba(82,224,209,.23),rgba(17,38,51,.96) 72%); color:var(--cyan); font-size:.86rem; font-weight:700; box-shadow:0 0 18px rgba(82,224,209,.11); }
+.mentor-name { color:var(--ink); font-weight:700; font-size:.91rem; }
+.mentor-role { display:block; color:var(--muted); font-size:.71rem; margin-top:2px; }
+.mentor-note { color:#c7d5e2; line-height:1.8; font-size:.84rem; margin:0; }
+.mentor-disclaimer { color:#8195a8; font-size:.68rem; margin-top:9px; }
 [data-testid="stTabs"] button { font-weight:600; }
 [data-testid="stSlider"] [data-baseweb="slider"] { padding-top:.4rem; }
 div[data-testid="stPlotlyChart"] { border:1px solid rgba(54,76,97,.72); border-radius:14px; overflow:hidden; background:rgba(9,17,27,.72); }
@@ -160,6 +169,27 @@ with pages[0]:
         phase_col1.metric("تغيّر RSSI", f"{stats['rssi_dbm']['delta']:+.1f} dB", help="المتوسط أثناء الحادث ناقص المتوسط الأساسي")
         phase_col2.metric("تغيّر SNR", f"{stats['snr_db']['delta']:+.1f} dB")
         st.markdown('<div class="verdict"><b>مهم:</b> التشخيص قاعدة تعليمية شفافة، وليس قياساً من شبكة فعلية.</div>', unsafe_allow_html=True)
+        st.markdown("##### المشرف د. محمد")
+        show_doctor_model = st.toggle("إظهار المجسم ثلاثي الأبعاد", value=True, key="show_doctor_model")
+        if show_doctor_model:
+            components.iframe("/app/static/doctor_character/index.html", height=300, scrolling=False)
+        st.session_state.setdefault("mentor_hint_level", 0)
+        mentor_text = mentor_guidance(
+            phase=str(current["phase"]),
+            rssi_delta=float(stats["rssi_dbm"]["delta"]),
+            snr_delta=float(stats["snr_db"]["delta"]),
+            rssi_std_ratio=float(stats["rssi_dbm"]["std_ratio"]),
+            hint_level=int(st.session_state["mentor_hint_level"]),
+        )
+        st.markdown(
+            f'<div class="mentor-card"><div class="mentor-head"><div class="mentor-avatar">د.م</div>'
+            f'<div><div class="mentor-name">د. محمد</div><span class="mentor-role">مشرف المختبر · مرشد تعليمي</span></div></div>'
+            f'<p class="mentor-note">{mentor_text}</p><div class="mentor-disclaimer">التوجيه مبني على بيانات المحاكاة الحالية، ولا يكشف التشخيص مباشرة.</div></div>',
+            unsafe_allow_html=True,
+        )
+        if st.button("تلميح آخر للمحقق", key="mentor_next_hint", use_container_width=True):
+            st.session_state["mentor_hint_level"] = (int(st.session_state["mentor_hint_level"]) + 1) % 3
+            st.rerun()
 
 with pages[1]:
     st.markdown('<div class="section-kicker">PROPAGATION FIELD</div>', unsafe_allow_html=True)

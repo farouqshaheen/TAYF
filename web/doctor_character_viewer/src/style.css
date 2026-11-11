@@ -1,0 +1,10 @@
+* { box-sizing: border-box; }
+html, body { width: 100%; height: 100%; margin: 0; overflow: hidden; }
+body { color: #d9e6ee; background: #0b1520; font-family: "IBM Plex Sans Arabic", system-ui, sans-serif; }
+#stage { position: relative; width: 100%; height: 300px; overflow: hidden; border: 1px solid rgba(82,224,209,.25); border-radius: 14px; background: radial-gradient(ellipse at 50% 85%, rgba(20,54,66,.72), #0b1520 68%); }
+#stage canvas { display: block; width: 100%; height: 100%; cursor: grab; touch-action: none; }
+#stage canvas:active { cursor: grabbing; }
+#loading, #error { position: absolute; z-index: 2; left: 50%; top: 45%; transform: translate(-50%,-50%); color: #a9c3d2; font-size: 13px; text-align: center; }
+#error { color: #ffbd69; padding: 10px 14px; border: 1px solid rgba(255,189,105,.28); border-radius: 10px; background: rgba(11,21,32,.9); }
+#status { position: absolute; z-index: 2; right: 11px; top: 10px; padding: 5px 9px; color: #9bb5c4; border: 1px solid rgba(82,224,209,.17); border-radius: 99px; background: rgba(8,17,27,.72); font-size: 10px; pointer-events: none; }
+@media (prefers-reduced-motion: reduce) { #stage canvas { cursor: default; } }
